@@ -1,17 +1,25 @@
 #! /usr/bin/env python
-
+from __future__ import absolute_import, print_function
 import argparse
 import os
 import cv2
+import json
+
 import numpy as np
 from tqdm import tqdm
+
 from preprocessing import parse_annotation
 from utils import draw_boxes
 from frontend import YOLO
-import json
 
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
+try:
+    from mean_average_precision.detection_map import DetectionMAP
+    calc_map = True
+except ImportError:
+    calc_map = False
+
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 argparser = argparse.ArgumentParser(
     description='Train and validate YOLO_v2 model on any dataset')
@@ -68,20 +76,20 @@ def _main_(args):
         frame_w = int(video_reader.get(cv2.CAP_PROP_FRAME_WIDTH))
 
         video_writer = cv2.VideoWriter(video_out,
-                               cv2.VideoWriter_fourcc(*'MPEG'), 
-                               50.0, 
-                               (frame_w, frame_h))
+                                       cv2.VideoWriter_fourcc(*'MPEG'),
+                                       50.0,
+                                       (frame_w, frame_h))
 
-        for i in tqdm(range(nb_frames)):
+        for _ in tqdm(range(nb_frames)):
             _, image = video_reader.read()
-            
+
             boxes = yolo.predict(image)
             image = draw_boxes(image, boxes, config['model']['labels'])
 
             video_writer.write(np.uint8(image))
 
         video_reader.release()
-        video_writer.release()  
+        video_writer.release()
     else:
         image = cv2.imread(image_path)
         boxes = yolo.predict(image)

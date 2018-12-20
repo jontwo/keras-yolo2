@@ -1,0 +1,24 @@
+
+# IDE specific files
+*.sublime-project
+*.sublime-workspace
+.project
+.pydevproject
+.settings
+*.swp
+.idea/
+.ipynb_checkpoints/
+
+*.egg-info/
+*.log*
+*.aux.xml
+*.pyc
+*.lock
+*.h5
+
+#Binary files
+*.o
+*.obj
+*.exe
+*.lib
+*.exp
