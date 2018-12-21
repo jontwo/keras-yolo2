@@ -9,11 +9,8 @@ import numpy as np
 import imgaug as ia
 from imgaug import augmenters as iaa
 from keras.utils import Sequence
-from skimage import io, transform
 # Project imports
 from utils import BoundBox, bbox_iou
-
-USE_SKIMAGE = False
 
 
 def parse_annotation(ann_dir, img_dir, labels=None):
@@ -179,24 +176,7 @@ class BatchGenerator(Sequence):
         return np.array(annots)
 
     def load_image(self, i):
-        if USE_SKIMAGE:
-            return self.skimage_load_image(self.images[i]['filename'])
-
         return cv2.imread(self.images[i]['filename'])
-
-    @staticmethod
-    def skimage_load_image(filename):
-        image = io.imread(filename)
-
-        # normalize image and make it look like an OpenCV image
-        mask = image == image.min()
-        image[mask] = 0
-        scale = image.max() / 255.
-        image = image.astype('float32')
-        image /= scale
-        image = image.astype('uint8')
-
-        return image
 
     def __getitem__(self, idx):
         l_bound = idx * self.config['BATCH_SIZE']
@@ -304,12 +284,9 @@ class BatchGenerator(Sequence):
     def aug_image(self, train_instance, jitter):
         image_name = train_instance['filename']
         try:
-            if USE_SKIMAGE:
-                image = self.skimage_load_image(image_name)
-            else:
-                image = cv2.imread(image_name)
-                if image is None:
-                    raise IOError
+            image = cv2.imread(image_name)
+            if image is None:
+                raise IOError
         except IOError:
             raise RuntimeError('Cannot open {}: does not exist or is not valid'.format(image_name))
 
@@ -319,13 +296,7 @@ class BatchGenerator(Sequence):
         if jitter:
             # scale the image
             scale = np.random.uniform() / 10. + 1.
-            if USE_SKIMAGE:
-                new_w = int(round(w * scale))
-                new_h = int(round(h * scale))
-                image = transform.resize(image, (new_h, new_w, c), mode='symmetric',
-                                         preserve_range=True)
-            else:
-                image = cv2.resize(image, (0, 0), fx=scale, fy=scale)
+            image = cv2.resize(image, (0, 0), fx=scale, fy=scale)
 
             # translate the image
             max_offx = (scale - 1.) * w
@@ -338,19 +309,12 @@ class BatchGenerator(Sequence):
             # flip the image
             flip = np.random.binomial(1, .5)
             if flip > 0.5:
-                if USE_SKIMAGE:
-                    image = np.flip(image, 0)
-                else:
-                    cv2.flip(image, 1)
+                cv2.flip(image, 1)
 
             image = self.aug_pipe.augment_image(image)
 
         # resize the image to standard size
-        if USE_SKIMAGE:
-            image = transform.resize(image, (self.config['IMAGE_H'], self.config['IMAGE_W'], c),
-                                     mode='symmetric', preserve_range=True)
-        else:
-            image = cv2.resize(image, (self.config['IMAGE_H'], self.config['IMAGE_W']))
+        image = cv2.resize(image, (self.config['IMAGE_H'], self.config['IMAGE_W']))
         image = image[:, :, ::-1]
 
         # fix object's position and size
