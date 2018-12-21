@@ -259,8 +259,6 @@ class YOLO(object):
         return loss
 
     def load_weights(self, weight_path):
-        from pdb import set_trace
-        set_trace()
         self.model.load_weights(weight_path)
 
     def train(self, train_imgs,  # the list of images to train the model
