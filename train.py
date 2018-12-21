@@ -2,14 +2,13 @@
 from __future__ import absolute_import, print_function
 
 import argparse
-import os
-import numpy as np
-from preprocessing import parse_annotation
-from frontend import YOLO
 import json
+import os
 
-os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+import numpy as np
+
+from frontend import YOLO
+from preprocessing import parse_annotation
 
 argparser = argparse.ArgumentParser(
     description='Train and validate YOLO_v2 model on any dataset')
@@ -55,8 +54,8 @@ def _main_(args):
         print('Overlap labels:\t', overlap_labels)
 
         if len(overlap_labels) < len(config['model']['labels']):
-            print(
-                'Some labels have no annotations! Please revise the list of labels in the config.json file!')
+            print('Some labels have no annotations! Please revise the list of labels in the '
+                  'config.json file!')
             return
     else:
         print('No labels are provided. Train on all seen labels.')

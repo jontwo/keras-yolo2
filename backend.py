@@ -20,6 +20,7 @@ RESNET50_BACKEND_PATH = "resnet50_backend.h5"  # should be hosted on a server
 
 class BaseFeatureExtractor(object):
     """docstring for ClassName"""
+    feature_extractor = None
 
     # to be defined in each subclass
     def __init__(self, input_size):

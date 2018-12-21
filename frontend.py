@@ -1,20 +1,30 @@
 from __future__ import absolute_import, print_function
-from keras.models import Model
-from keras.layers import Reshape, Activation, Conv2D, Input, MaxPooling2D, BatchNormalization, \
-    Flatten, Dense, Lambda
-from keras.layers.advanced_activations import LeakyReLU
+import cv2
+import os
+
 import tensorflow as tf
 import numpy as np
-import os
-import cv2
-from utils import decode_netout, compute_overlap, compute_ap
 from keras.applications.mobilenet import MobileNet
-from keras.layers.merge import concatenate
-from keras.optimizers import SGD, Adam, RMSprop
-from preprocessing import BatchGenerator
 from keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
-from backend import TinyYoloFeature, FullYoloFeature, MobileNetFeature, SqueezeNetFeature, \
+from keras.layers import (
+    Reshape, Activation, Conv2D, Input, MaxPooling2D, BatchNormalization,
+    Flatten, Dense, Lambda
+)
+from keras.layers.advanced_activations import LeakyReLU
+from keras.layers.merge import concatenate
+from keras.models import Model
+from keras.optimizers import SGD, Adam, RMSprop
+
+from backend import (
+    TinyYoloFeature, FullYoloFeature, MobileNetFeature, SqueezeNetFeature,
     Inception3Feature, VGG16Feature, ResNet50Feature
+)
+from preprocessing import BatchGenerator
+from utils import decode_netout, compute_overlap, compute_ap
+
+os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 
 class YOLO(object):
@@ -23,6 +33,14 @@ class YOLO(object):
                  labels,
                  max_box_per_image,
                  anchors):
+
+        self.batch_size = None
+        self.object_scale = None
+        self.no_object_scale = None
+        self.coord_scale = None
+        self.class_scale = None
+        self.debug = None
+        self.warmup_batches = None
 
         self.input_size = input_size
 
@@ -204,19 +222,14 @@ class YOLO(object):
         no_boxes_mask = tf.to_float(coord_mask < self.coord_scale / 2.)
         seen = tf.assign_add(seen, 1.)
 
-        true_box_xy, true_box_wh, coord_mask = tf.cond(tf.less(seen, self.warmup_batches + 1),
-                                                       lambda: [true_box_xy + (
-                                                               0.5 + cell_grid) * no_boxes_mask,
-                                                                true_box_wh + tf.ones_like(
-                                                                    true_box_wh) * \
-                                                                np.reshape(self.anchors,
-                                                                           [1, 1, 1, self.nb_box,
-                                                                            2]) * \
-                                                                no_boxes_mask,
-                                                                tf.ones_like(coord_mask)],
-                                                       lambda: [true_box_xy,
-                                                                true_box_wh,
-                                                                coord_mask])
+        true_box_xy, true_box_wh, coord_mask = tf.cond(
+            tf.less(seen, self.warmup_batches + 1),
+            lambda: [true_box_xy + (0.5 + cell_grid) * no_boxes_mask,
+                     true_box_wh + tf.ones_like(true_box_wh) * np.reshape(
+                         self.anchors, [1, 1, 1, self.nb_box, 2]) * no_boxes_mask,
+                     tf.ones_like(coord_mask)],
+            lambda: [true_box_xy, true_box_wh, coord_mask]
+        )
 
         """
         Finalize the loss
@@ -346,17 +359,17 @@ class YOLO(object):
 
         ############################################
         # Start the training process
-        ############################################        
+        ############################################
 
-        self.model.fit_generator(generator        = train_generator, 
-                                 steps_per_epoch  = len(train_generator) * train_times, 
-                                 epochs           = warmup_epochs + nb_epochs, 
-                                 verbose          = 2 if debug else 1,
-                                 validation_data  = valid_generator,
-                                 validation_steps = len(valid_generator) * valid_times,
-                                 callbacks        = [early_stop, checkpoint, tensorboard], 
-                                 workers          = 3,
-                                 max_queue_size   = 8)      
+        self.model.fit_generator(generator=train_generator,
+                                 steps_per_epoch=len(train_generator) * train_times,
+                                 epochs=warmup_epochs + nb_epochs,
+                                 verbose=2 if debug else 1,
+                                 validation_data=valid_generator,
+                                 validation_steps=len(valid_generator) * valid_times,
+                                 callbacks=[early_stop, checkpoint, tensorboard],
+                                 workers=3,
+                                 max_queue_size=8)
 
         ############################################
         # Compute mAP on the validation set
@@ -380,7 +393,8 @@ class YOLO(object):
         # Arguments
             generator       : The generator that represents the dataset to evaluate.
             model           : The model to evaluate.
-            iou_threshold   : The threshold used to consider when a detection is positive or negative.
+            iou_threshold   : The threshold used to consider when a detection is positive or
+                              negative.
             score_threshold : The score confidence threshold to use for detections.
             max_detections  : The maximum number of detections to use per image.
             save_path       : The path to save images with visualized detections to.
@@ -388,9 +402,9 @@ class YOLO(object):
             A dict mapping class names to mAP scores.
         """
         # gather all detections and annotations
-        all_detections = [[None for i in range(generator.num_classes())] for j in
+        all_detections = [[None for _ in range(generator.num_classes())] for _ in
                           range(generator.size())]
-        all_annotations = [[None for i in range(generator.num_classes())] for j in
+        all_annotations = [[None for _ in range(generator.num_classes())] for _ in
                            range(generator.size())]
 
         for i in range(generator.size()):
@@ -452,7 +466,8 @@ class YOLO(object):
                     assigned_annotation = np.argmax(overlaps, axis=1)
                     max_overlap = overlaps[0, assigned_annotation]
 
-                    if max_overlap >= iou_threshold and assigned_annotation not in detected_annotations:
+                    if (max_overlap >= iou_threshold and
+                            assigned_annotation not in detected_annotations):
                         false_positives = np.append(false_positives, 0)
                         true_positives = np.append(true_positives, 1)
                         detected_annotations.append(assigned_annotation)
