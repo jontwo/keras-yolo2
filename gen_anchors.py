@@ -118,6 +118,10 @@ def main(args):
                                                 config['train']['train_image_folder'],
                                                 config['model']['labels'])
 
+    if not train_imgs:
+        print('ERROR: No images found for labels {}'.format(config['model']['labels']))
+        return
+
     grid_w = config['model']['input_size'] / 32
     grid_h = config['model']['input_size'] / 32
 
@@ -136,9 +140,13 @@ def main(args):
     centroids = run_kmeans(annotation_dims, num_anchors)
 
     # write anchors to file
-    print(
-        '\naverage IOU for', num_anchors, 'anchors:', '%0.2f' % avg_IOU(annotation_dims, centroids))
+    print('\naverage IOU for', num_anchors, 'anchors:', '%0.2f' % avg_IOU(
+        annotation_dims, centroids))
     print_anchors(centroids)
+    config['model']['anchors'] = np.array(sorted(centroids.tolist())).flatten().tolist()
+
+    with open(config_path, 'w') as config_buffer:
+        json.dump(config, config_buffer)
 
 
 if __name__ == '__main__':
