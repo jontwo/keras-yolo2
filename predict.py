@@ -71,10 +71,18 @@ def predict_file(image_path, yolo, config, show_stats):
         video_writer.release()
     else:
         image = cv2.imread(image_path)
+        if image is None:
+            print(image, 'is not an image')
+            return
         boxes = yolo.predict(image)
         image = draw_boxes(image, boxes, config['model']['labels'])
 
+        print(image_path)
         print(len(boxes), 'boxes are found')
+        if show_stats:
+            for box in boxes:
+                print('{} {} ({}, {}, {}, {})'.format(box.label, box.score, box.xmin, box.ymin,
+                                                      box.xmax, box.ymax))
 
         cv2.imwrite(image_path[:-4] + '_detected' + image_path[-4:], image)
 
@@ -110,7 +118,6 @@ def _main_(args):
 
     if os.path.isdir(image_path):
         for img in os.listdir(image_path):
-            print('PREDICT', img)
             predict_file(os.path.join(image_path, img), yolo, config, show_stats)
     else:
         predict_file(image_path, yolo, config, show_stats)

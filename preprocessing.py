@@ -6,7 +6,6 @@ import xml.etree.ElementTree as ET
 # 3rd party imports
 import cv2
 import numpy as np
-import imgaug as ia
 from imgaug import augmenters as iaa
 from keras.utils import Sequence
 # Project imports
@@ -26,7 +25,7 @@ def parse_annotation(ann_dir, img_dir, labels=None):
 
         for elem in tree.iter():
             if 'filename' in elem.tag:
-                img['filename'] = img_dir + elem.text
+                img['filename'] = os.path.join(img_dir, elem.text)
             if 'width' in elem.tag:
                 img['width'] = int(elem.text)
             if 'height' in elem.tag:
@@ -84,8 +83,7 @@ class BatchGenerator(Sequence):
                         in range(int(len(config['ANCHORS']) // 2))]
 
         # augmentors by https://github.com/aleju/imgaug
-        def sometimes(aug):
-            iaa.Sometimes(0.5, aug)
+        sometimes = lambda aug: iaa.Sometimes(0.5, aug)
 
         # Define our sequence of augmentation steps that will be applied to every image
         # All augmenters with per_channel=0.5 will sample one value _per image_
