@@ -1,5 +1,5 @@
 """
-Something something farmpy.show_images
+Show images in matplotlib with annotation drawn on top
 
 Created on 24th December 2018
 
@@ -28,6 +28,41 @@ def is_image(filename):
     return os.path.splitext(filename.lower())[1] in IMAGE_TYPES
 
 
+def add_rect_to_ax(ax, x, y, w, h):
+    rectr = patches.Rectangle((x, y), w, h, fill=False, edgecolor='r', linewidth=2)
+    rectk = patches.Rectangle((x, y), w, h, fill=False)
+    ax.add_patch(rectr)
+    ax.add_patch(rectk)
+
+
+def plot_image(filename, bbox, separate=False):
+    img = plt.imread(filename)
+    cols = img.shape[-1] if separate else 1
+    xsize, ysize = plt.rcParams.get('figure.figsize')
+    xsize *= cols * 0.6
+    fig, ax = plt.subplots(1, cols, figsize=[xsize, ysize])
+    width = bbox['xmax'] - bbox['xmin']
+    height = bbox['ymax'] - bbox['ymin']
+    print('\nShowing', filename)
+    print('Bbox', bbox)
+    print('Image max: {} min: {} mean: {} ({}) sd: {} ({})'.format(img.max(), img.min(), img.mean(),
+          img.mean() / img.max(), img.std(), img.std() / img.max()))
+    if cols == 1:
+        ax.set_title(filename)
+        ax.imshow(img)
+        add_rect_to_ax(ax, bbox['xmin'], bbox['ymin'], width, height)
+    else:
+        fig.suptitle(filename)
+        for i in range(cols):
+            band = img[..., i]
+            print('Band {} max: {} min: {} mean: {} ({}) sd: {} ({})'.format(
+                i, band.max(), band.min(), band.mean(), band.mean() / band.max(),
+                band.std(), band.std() / band.max()))
+            ax[i].imshow(band, cmap='gray')
+            add_rect_to_ax(ax[i], bbox['xmin'], bbox['ymin'], width, height)
+    plt.show()
+
+
 def main():
     argparser = argparse.ArgumentParser(description=PARSER_HELP_STR)
 
@@ -37,6 +72,8 @@ def main():
                            help='path to image directory')
     argparser.add_argument('-s', '--suffix', default='',
                            help='image file suffix')
+    argparser.add_argument('-m', '--multi_image', action='store_true',
+                           help='show multi-band images in separate plots')
 
     args = argparser.parse_args()
     conf_type = os.path.splitext(args.conf)[1]
@@ -77,17 +114,7 @@ def main():
         return
 
     for imobj in train_imgs:
-        img = plt.imread(imobj['filename'])
-        fig, ax = plt.subplots(1)
-        ax.set_title(imobj['filename'])
-        ax.imshow(img)
-        bbox = imobj['object'][0]
-        width = bbox['xmax'] - bbox['xmin']
-        height = bbox['ymax'] - bbox['ymin']
-        rect = patches.Rectangle((bbox['xmin'], bbox['ymin']), width, height, fill=False)
-        ax.add_patch(rect)
-        print(bbox)
-        plt.show()
+        plot_image(imobj['filename'], imobj['object'][0], separate=args.multi_image)
 
 
 if __name__ == '__main__':
