@@ -102,6 +102,9 @@ def run_kmeans(ann_dims, anchor_num):
             centroid_sums[assignments[i]] += ann_dims[i]
         for j in range(anchor_num):
             centroids[j] = centroid_sums[j] / (np.sum(assignments == j) + 1e-6)
+            if centroids[j].all() == 0:
+                # zeroes will cause NaNs during training
+                centroids[j] += 1e-6
 
         prev_assignments = assignments.copy()
         old_distances = distances.copy()
